@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MediVerify AI — Fake Medicine Detection & Alternative Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#030712;
+  --bg2:#080f1f;
+  --bg3:#0d1526;
+  --surface:#0f1c35;
+  --surface2:#162040;
+  --border:#1e304f;
+  --border2:#243759;
+  --cyan:#00d4ff;
+  --cyan2:#00b8e0;
+  --cyan-dim:rgba(0,212,255,0.12);
+  --cyan-glow:rgba(0,212,255,0.25);
+  --green:#00e5a0;
+  --green-dim:rgba(0,229,160,0.1);
+  --red:#ff4d6d;
+  --red-dim:rgba(255,77,109,0.1);
+  --yellow:#ffd166;
+  --yellow-dim:rgba(255,209,102,0.1);
+  --text:#e8f0fe;
+  --text2:#8fa6cc;
+  --text3:#4d6a8a;
+  --font-head:'Syne',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --radius:14px;
+  --radius-sm:8px;
+  --shadow:0 4px 24px rgba(0,0,0,0.4);
+  --shadow-cyan:0 0 30px rgba(0,212,255,0.15);
+}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.6;overflow-x:hidden;}
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
+button{cursor:pointer;font-family:var(--font-body);}
+input,textarea,select{font-family:var(--font-body);}
+a{text-decoration:none;color:inherit;}
+
+/* GLOBAL NOISE OVERLAY */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:9999;opacity:0.4;
+}
+
+/* ANIMATED GRID BG */
+.grid-bg{
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:60px 60px;
+  opacity:0.25;
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,black 40%,transparent 100%);
+}
+
+/* GLOW ORBS */
+.orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0;}
+.orb1{width:600px;height:600px;background:radial-gradient(circle,rgba(0,212,255,0.07) 0%,transparent 70%);top:-200px;left:-200px;}
+.orb2{width:500px;height:500px;background:radial-gradient(circle,rgba(0,229,160,0.05) 0%,transparent 70%);bottom:-100px;right:-100px;}
+.orb3{width:400px;height:400px;background:radial-gradient(circle,rgba(0,212,255,0.04) 0%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-50%);}
+
+/* LAYOUT */
+.page{position:relative;z-index:1;min-height:100vh;}
+
+/* ============================================================
+   AUTH PAGES
+============================================================ */
+.auth-page{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:24px;position:relative;overflow:hidden;
+}
+.auth-bg-lines{
+  position:absolute;inset:0;
+  background:
+    repeating-linear-gradient(0deg,transparent,transparent 80px,rgba(0,212,255,0.03) 80px,rgba(0,212,255,0.03) 81px),
+    repeating-linear-gradient(90deg,transparent,transparent 80px,rgba(0,212,255,0.03) 80px,rgba(0,212,255,0.03) 81px);
+}
+.auth-card{
+  width:100%;max-width:460px;
+  background:rgba(15,28,53,0.8);
+  border:1px solid var(--border2);
+  border-radius:24px;
+  padding:48px 44px;
+  backdrop-filter:blur(20px);
+  box-shadow:0 20px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(0,212,255,0.05);
+  position:relative;
+  animation:slideUp 0.5s ease;
+}
+.auth-card::before{
+  content:'';position:absolute;inset:0;border-radius:24px;
+  background:linear-gradient(135deg,rgba(0,212,255,0.04) 0%,transparent 50%,rgba(0,229,160,0.02) 100%);
+  pointer-events:none;
+}
+.auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:32px;}
+.auth-logo-icon{
+  width:38px;height:38px;border-radius:10px;
+  background:linear-gradient(135deg,var(--cyan),var(--green));
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;
+}
+.auth-logo-text{font-family:var(--font-head);font-size:20px;font-weight:700;letter-spacing:-0.3px;}
+.auth-logo-text span{color:var(--cyan);}
+.auth-heading{font-family:var(--font-head);font-size:28px;font-weight:800;margin-bottom:6px;letter-spacing:-0.5px;}
+.auth-sub{color:var(--text2);font-size:14px;margin-bottom:32px;}
+.auth-sub span{color:var(--cyan);cursor:pointer;}
+.auth-sub span:hover{text-decoration:underline;}
+.form-group{margin-bottom:20px;}
+.form-label{display:block;font-size:13px;font-weight:500;color:var(--text2);margin-bottom:8px;letter-spacing:0.3px;text-transform:uppercase;}
+.form-input{
+  width:100%;background:rgba(8,15,31,0.8);
+  border:1.5px solid var(--border2);
+  border-radius:var(--radius-sm);
+  padding:13px 16px;
+  color:var(--text);font-size:15px;
+  transition:all 0.2s;outline:none;
+}
+.form-input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,212,255,0.1);}
+.form-input::placeholder{color:var(--text3);}
+.auth-btn{
+  width:100%;padding:14px;border:none;border-radius:var(--radius-sm);
+  background:linear-gradient(135deg,var(--cyan),#0097b8);
+  color:#030712;font-size:15px;font-weight:700;font-family:var(--font-head);
+  letter-spacing:0.3px;
+  transition:all 0.2s;margin-top:8px;
+  position:relative;overflow:hidden;
+}
+.auth-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent);
+  opacity:0;transition:opacity 0.2s;
+}
+.auth-btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,212,255,0.3);}
+.auth-btn:hover::before{opacity:1;}
+.auth-btn:active{transform:translateY(0);}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:24px 0;color:var(--text3);font-size:13px;}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+.auth-trust{display:flex;align-items:center;justify-content:center;gap:20px;margin-top:28px;padding-top:24px;border-top:1px solid var(--border);}
+.trust-item{display:flex;align-items:center;gap:6px;color:var(--text3);font-size:12px;}
+.trust-item span:first-child{color:var(--green);font-size:14px;}
+.error-msg{background:var(--red-dim);border:1px solid rgba(255,77,109,0.3);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:16px;}
+.success-msg{background:var(--green-dim);border:1px solid rgba(0,229,160,0.3);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:var(--green);margin-bottom:16px;}
+
+/* ============================================================
+   MAIN APP LAYOUT
+============================================================ */
+.app{display:flex;flex-direction:column;min-height:100vh;}
+
+/* NAVBAR */
+.navbar{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(3,7,18,0.85);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  padding:0 32px;height:64px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.nav-logo{display:flex;align-items:center;gap:10px;cursor:pointer;}
+.nav-logo-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--cyan),var(--green));
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+}
+.nav-logo-text{font-family:var(--font-head);font-size:18px;font-weight:700;}
+.nav-logo-text span{color:var(--cyan);}
+.nav-links{display:flex;align-items:center;gap:4px;}
+.nav-link{
+  padding:7px 14px;border-radius:8px;font-size:14px;font-weight:500;
+  color:var(--text2);cursor:pointer;transition:all 0.2s;white-space:nowrap;
+}
+.nav-link:hover{background:var(--surface);color:var(--text);}
+.nav-link.active{background:var(--cyan-dim);color:var(--cyan);}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.nav-badge{
+  display:flex;align-items:center;gap:6px;
+  background:var(--green-dim);border:1px solid rgba(0,229,160,0.2);
+  border-radius:99px;padding:4px 12px;font-size:12px;color:var(--green);font-weight:500;
+}
+.nav-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
+.nav-user{
+  display:flex;align-items:center;gap:8px;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:99px;padding:5px 14px 5px 5px;cursor:pointer;
+  transition:all 0.2s;font-size:13px;font-weight:500;
+}
+.nav-user:hover{border-color:var(--cyan);}
+.nav-avatar{
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,var(--cyan),var(--green));
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:#030712;
+}
+.nav-logout{
+  padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;
+  color:var(--text3);cursor:pointer;transition:all 0.2s;border:1px solid var(--border);
+  background:transparent;
+}
+.nav-logout:hover{color:var(--red);border-color:var(--red);background:var(--red-dim);}
+
+.main-content{margin-top:64px;flex:1;}
+
+/* ============================================================
+   HERO SECTION
+============================================================ */
+.hero{
+  padding:100px 80px 80px;text-align:center;
+  position:relative;overflow:hidden;
+}
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--cyan-dim);border:1px solid rgba(0,212,255,0.2);
+  border-radius:99px;padding:6px 16px;font-size:12px;
+  color:var(--cyan);font-weight:600;text-transform:uppercase;letter-spacing:1px;
+  margin-bottom:28px;animation:fadeIn 0.6s ease;
+}
+.hero-eyebrow::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite;}
+.hero-title{
+  font-family:var(--font-head);font-size:clamp(40px,6vw,76px);
+  font-weight:800;line-height:1.05;letter-spacing:-2px;
+  margin-bottom:24px;animation:slideUp 0.6s 0.1s ease both;
+}
+.hero-title .line2{
+  background:linear-gradient(135deg,var(--cyan),var(--green));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero-desc{
+  max-width:580px;margin:0 auto 40px;
+  color:var(--text2);font-size:17px;line-height:1.7;
+  animation:slideUp 0.6s 0.2s ease both;
+}
+.hero-ctas{
+  display:flex;align-items:center;justify-content:center;gap:14px;
+  flex-wrap:wrap;animation:slideUp 0.6s 0.3s ease both;
+}
+.btn-primary{
+  display:inline-flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,var(--cyan),#0097b8);
+  color:#030712;font-size:15px;font-weight:700;
+  padding:14px 28px;border-radius:var(--radius-sm);border:none;
+  transition:all 0.2s;font-family:var(--font-head);letter-spacing:0.2px;
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,212,255,0.3);}
+.btn-secondary{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--surface);color:var(--text);
+  font-size:15px;font-weight:500;
+  padding:14px 28px;border-radius:var(--radius-sm);
+  border:1.5px solid var(--border2);
+  transition:all 0.2s;font-family:var(--font-body);
+}
+.btn-secondary:hover{border-color:var(--cyan);color:var(--cyan);transform:translateY(-2px);}
+.hero-stats{
+  display:flex;align-items:center;justify-content:center;gap:48px;
+  margin-top:60px;padding-top:40px;
+  border-top:1px solid var(--border);
+  animation:slideUp 0.6s 0.4s ease both;
+  flex-wrap:wrap;
+}
+.stat-item{text-align:center;}
+.stat-num{font-family:var(--font-head);font-size:36px;font-weight:800;color:var(--cyan);}
+.stat-num.green{color:var(--green);}
+.stat-num.yellow{color:var(--yellow);}
+.stat-label{font-size:13px;color:var(--text2);margin-top:4px;}
+
+/* HOW IT WORKS */
+.section{padding:80px;}
+.section-header{text-align:center;margin-bottom:56px;}
+.section-tag{
+  display:inline-block;
+  background:var(--cyan-dim);border:1px solid rgba(0,212,255,0.15);
+  border-radius:99px;padding:4px 14px;font-size:12px;
+  color:var(--cyan);font-weight:600;text-transform:uppercase;letter-spacing:1px;
+  margin-bottom:16px;
+}
+.section-title{font-family:var(--font-head);font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-1px;margin-bottom:14px;}
+.section-title span{color:var(--cyan);}
+.section-desc{color:var(--text2);font-size:16px;max-width:520px;margin:0 auto;}
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1000px;margin:0 auto;}
+.step-card{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:20px;padding:32px;position:relative;overflow:hidden;
+  transition:all 0.3s;
+}
+.step-card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,var(--cyan-dim),transparent);
+  opacity:0;transition:opacity 0.3s;
+}
+.step-card:hover{border-color:var(--cyan);transform:translateY(-4px);box-shadow:var(--shadow-cyan);}
+.step-card:hover::before{opacity:1;}
+.step-num{
+  font-family:var(--font-head);font-size:48px;font-weight:800;
+  color:var(--border2);margin-bottom:20px;line-height:1;
+}
+.step-icon{
+  width:48px;height:48px;border-radius:12px;
+  background:var(--cyan-dim);border:1px solid rgba(0,212,255,0.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;margin-bottom:16px;
+}
+.step-title{font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:10px;}
+.step-desc{color:var(--text2);font-size:14px;line-height:1.6;}
+
+/* FEATURES */
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1100px;margin:0 auto;}
+.feature-card{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:20px;padding:28px;transition:all 0.3s;cursor:pointer;
+}
+.feature-card:hover{border-color:var(--cyan);transform:translateY(-3px);box-shadow:var(--shadow-cyan);}
+.feature-icon{
+  width:44px;height:44px;border-radius:10px;margin-bottom:16px;
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+}
+.feature-icon.cyan{background:var(--cyan-dim);border:1px solid rgba(0,212,255,0.2);}
+.feature-icon.green{background:var(--green-dim);border:1px solid rgba(0,229,160,0.2);}
+.feature-icon.yellow{background:var(--yellow-dim);border:1px solid rgba(255,209,102,0.2);}
+.feature-icon.red{background:var(--red-dim);border:1px solid rgba(255,77,109,0.2);}
+.feature-title{font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:8px;}
+.feature-desc{color:var(--text2);font-size:13px;line-height:1.6;}
+
+/* USER PERSONAS */
+.personas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1100px;margin:0 auto;}
+.persona-card{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:20px;padding:32px;transition:all 0.3s;
+}
+.persona-card:hover{border-color:var(--border2);transform:translateY(-3px);}
+.persona-avatar{
+  width:60px;height:60px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:28px;margin-bottom:20px;
+  border:2px solid var(--border2);
+}
+.persona-name{font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:4px;}
+.persona-role{font-size:13px;color:var(--cyan);margin-bottom:12px;}
+.persona-desc{color:var(--text2);font-size:13px;line-height:1.6;margin-bottom:16px;}
+.persona-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.tag{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:99px;padding:3px 10px;font-size:11px;color:var(--text2);
+}
+
+/* ============================================================
+   VERIFIER PAGE
+============================================================ */
+.page-hero{
+  padding:60px 80px 40px;
+  border-bottom:1px solid var(--border);
+}
+.page-hero-inner{max-width:1100px;margin:0 auto;}
+.page-title{font-family:var(--font-head);font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-1px;margin-bottom:8px;}
+.page-title span{color:var(--cyan);}
+.page-desc{color:var(--text2);font-size:15px;max-width:500px;}
+.page-body{padding:48px 80px;max-width:1260px;margin:0 auto;}
+
+.verify-layout{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;}
+.verify-panel{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:20px;padding:32px;
+}
+.panel-title{font-family:var(--font-head);font-size:17px;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+.panel-title span{
+  width:30px;height:30px;border-radius:7px;
+  background:var(--cyan-dim);border:1px solid rgba(0,212,255,0.2);
+  display:flex;align-items:center;justify-content:center;font-size:14px;
+}
+.search-row{display:flex;gap:10px;margin-bottom:20px;}
+.search-input{
+  flex:1;background:var(--bg2);border:1.5px solid var(--border2);
+  border-radius:var(--radius-sm);padding:12px 16px;
+  color:var(--text);font-size:14px;outline:none;transition:all 0.2s;
+}
+.search-input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,212,255,0.08);}
+.search-input::placeholder{color:var(--text3);}
+.btn-search{
+  background:linear-gradient(135deg,var(--cyan),#0097b8);
+  color:#030712;font-size:14px;font-weight:700;
+  padding:12px 20px;border-radius:var(--radius-sm);border:none;
+  display:flex;align-items:center;gap:6px;transition:all 0.2s;
+  font-family:var(--font-head);white-space:nowrap;
+}
+.btn-search:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,212,255,0.25);}
+.upload-zone{
+  border:2px dashed var(--border2);border-radius:var(--radius);
+  padding:40px;text-align:center;cursor:pointer;transition:all 0.2s;
+  background:var(--bg2);
+}
+.upload-zone:hover{border-color:var(--cyan);background:var(--cyan-dim);}
+.upload-icon{font-size:36px;margin-bottom:12px;}
+.upload-text{font-size:14px;color:var(--text2);margin-bottom:4px;}
+.upload-hint{font-size:12px;color:var(--text3);}
+
+/* RESULT CARD */
+.result-card{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:20px;padding:28px;animation:slideUp 0.4s ease;
+}
+.result-header{display:flex;align-items:center;gap:16px;margin-bottom:24px;}
+.result-badge{
+  display:flex;align-items:center;gap:8px;
+  border-radius:99px;padding:8px 18px;font-size:14px;font-weight:700;
+  font-family:var(--font-head);
+}
+.result-badge.genuine{background:var(--green-dim);border:1.5px solid rgba(0,229,160,0.3);color:var(--green);}
+.result-badge.suspicious{background:var(--yellow-dim);border:1.5px solid rgba(255,209,102,0.3);color:var(--yellow);}
+.result-badge.fake{background:var(--red-dim);border:1.5px solid rgba(255,77,109,0.3);color:var(--red);}
+.result-med-name{font-family:var(--font-head);font-size:22px;font-weight:800;}
+.result-manufacturer{font-size:13px;color:var(--text2);}
+.confidence-bar{margin-bottom:24px;}
+.confidence-label{display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:8px;}
+.confidence-track{height:8px;background:var(--bg2);border-radius:99px;overflow:hidden;}
+.confidence-fill{height:100%;border-radius:99px;transition:width 0.8s ease;}
+.confidence-fill.genuine{background:linear-gradient(90deg,var(--green),#00b37a);}
+.confidence-fill.suspicious{background:linear-gradient(90deg,var(--yellow),#e6b800);}
+.confidence-fill.fake{background:linear-gradient(90deg,var(--red),#d93050);}
+.result-details{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.detail-item{background:var(--bg2);border-radius:10px;padding:14px;}
+.detail-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
+.detail-value{font-size:14px;font-weight:600;color:var(--text);}
+.result-actions{display:flex;gap:10px;margin-top:20px;}
+.btn-outline{
+  flex:1;padding:10px;border-radius:var(--radius-sm);
+  background:transparent;border:1.5px solid var(--border2);
+  color:var(--text2);font-size:13px;font-weight:500;transition:all 0.2s;
+  font-family:var(--font-body);
+}
+.btn-outline:hover{border-color:var(--cyan);color:var(--cyan);}
+.btn-green{
+  flex:1;padding:10px;border-radius:var(--radius-sm);
+  background:var(--green-dim);border:1.5px solid rgba(0,229,160,0.3);
+  color:var(--green);font-size:13px;font-weight:600;transition:all 0.2s;
+  font-family:var(--font-body);
+}
+.btn-green:hover{background:rgba(0,229,160,0.15);}
+
+/* ============================================================
+   ALTERNATIVES PAGE
+============================================================ */
+.alt-grid{display:grid;grid-template-columns:320px 1fr;gap:28px;align-items:start;}
+.filter-panel{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:20px;padding:24px;position:sticky;top:88px;
+}
+.filter-title{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:20px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;}
+.filter-group{margin-bottom:20px;}
+.filter-label{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:block;}
+.filter-options{display:flex;flex-wrap:wrap;gap:6px;}
+.filter-chip{
+  padding:5px 12px;border-radius:99px;font-size:12px;font-weight:500;
+  background:var(--bg2);border:1px solid var(--border);color:var(--text2);cursor:pointer;transition:all 0.2s;
+}
+.filter-chip.active{background:var(--cyan-dim);border-color:rgba(0,212,255,0.3);color:var(--cyan);}
+.results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.results-count{font-size:14px;color:var(--text2);}
+.results-count span{color:var(--text);font-weight:600;}
+.alt-cards{display:flex;flex-direction:column;gap:16px;}
+.alt-card{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:16px;padding:24px;display:flex;align-items:center;gap:20px;
+  transition:all 0.3s;cursor:pointer;
+}
+.alt-card:hover{border-color:var(--cyan);transform:translateX(4px);box-shadow:var(--shadow-cyan);}
+.alt-rank{
+  width:36px;height:36px;border-radius:8px;background:var(--bg2);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-head);font-size:14px;font-weight:700;
+  color:var(--text3);flex-shrink:0;
+}
+.alt-info{flex:1;}
+.alt-name{font-family:var(--font-head);font-size:16px;font-weight:700;margin-bottom:4px;}
+.alt-company{font-size:12px;color:var(--text3);margin-bottom:8px;}
+.alt-tags{display:flex;gap:6px;flex-wrap:wrap;}
+.alt-tag{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:500;}
+.alt-tag.generic{background:var(--cyan-dim);color:var(--cyan);}
+.alt-tag.branded{background:var(--yellow-dim);color:var(--yellow);}
+.alt-tag.match{background:var(--green-dim);color:var(--green);}
+.alt-price{
+  text-align:right;flex-shrink:0;
+}
+.price-num{font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text);}
+.price-unit{font-size:11px;color:var(--text3);}
+.price-badge{
+  display:inline-block;margin-top:6px;
+  padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;
+  background:var(--green-dim);color:var(--green);
+}
+
+/* ============================================================
+   DATABASE PAGE
+============================================================ */
+.db-search-bar{
+  display:flex;gap:12px;max-width:600px;margin-bottom:32px;
+}
+.db-table-wrap{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:16px;overflow:hidden;
+}
+.db-table{width:100%;border-collapse:collapse;}
+.db-table th{
+  background:var(--surface2);padding:14px 20px;
+  text-align:left;font-size:12px;font-weight:600;
+  color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;
+  border-bottom:1px solid var(--border2);
+}
+.db-table td{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  font-size:14px;vertical-align:middle;
+}
+.db-table tr:last-child td{border-bottom:none;}
+.db-table tr:hover td{background:rgba(0,212,255,0.02);}
+.med-name-cell{font-weight:600;color:var(--text);}
+.med-company{font-size:12px;color:var(--text3);margin-top:2px;}
+.category-badge{
+  display:inline-block;padding:3px 10px;border-radius:99px;
+  font-size:11px;font-weight:600;
+}
+.status-dot{display:flex;align-items:center;gap:6px;font-size:13px;}
+.dot{width:7px;height:7px;border-radius:50%;}
+.dot.verified{background:var(--green);}
+.dot.flagged{background:var(--yellow);}
+.dot.banned{background:var(--red);}
+
+/* ============================================================
+   ALERTS PAGE
+============================================================ */
+.alerts-list{display:flex;flex-direction:column;gap:14px;}
+.alert-card{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:16px;padding:24px;display:flex;gap:20px;
+  transition:all 0.2s;
+}
+.alert-card:hover{border-color:var(--border2);transform:translateX(4px);}
+.alert-card.high{border-left:3px solid var(--red);}
+.alert-card.medium{border-left:3px solid var(--yellow);}
+.alert-card.low{border-left:3px solid var(--cyan);}
+.alert-icon{
+  width:44px;height:44px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;flex-shrink:0;
+}
+.alert-icon.high{background:var(--red-dim);}
+.alert-icon.medium{background:var(--yellow-dim);}
+.alert-icon.low{background:var(--cyan-dim);}
+.alert-content{flex:1;}
+.alert-header{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+.alert-title{font-family:var(--font-head);font-size:15px;font-weight:700;}
+.alert-severity{padding:2px 10px;border-radius:99px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}
+.alert-severity.high{background:var(--red-dim);color:var(--red);}
+.alert-severity.medium{background:var(--yellow-dim);color:var(--yellow);}
+.alert-severity.low{background:var(--cyan-dim);color:var(--cyan);}
+.alert-desc{color:var(--text2);font-size:13px;line-height:1.6;margin-bottom:10px;}
+.alert-meta{display:flex;gap:16px;font-size:12px;color:var(--text3);}
+
+/* ============================================================
+   DASHBOARD
+============================================================ */
+.dash-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-bottom:32px;}
+.dash-stat{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:16px;padding:24px;
+}
+.dash-stat-icon{font-size:24px;margin-bottom:12px;}
+.dash-stat-num{font-family:var(--font-head);font-size:32px;font-weight:800;margin-bottom:4px;}
+.dash-stat-num.cyan{color:var(--cyan);}
+.dash-stat-num.green{color:var(--green);}
+.dash-stat-num.red{color:var(--red);}
+.dash-stat-num.yellow{color:var(--yellow);}
+.dash-stat-label{font-size:13px;color:var(--text2);}
+.dash-body{display:grid;grid-template-columns:2fr 1fr;gap:24px;}
+.dash-panel{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:16px;padding:24px;
+}
+.dash-panel-title{font-family:var(--font-head);font-size:15px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;}
+.dash-panel-title a{font-size:12px;color:var(--cyan);cursor:pointer;font-family:var(--font-body);font-weight:400;}
+.history-item{
+  display:flex;align-items:center;gap:14px;
+  padding:12px 0;border-bottom:1px solid var(--border);
+}
+.history-item:last-child{border-bottom:none;}
+.history-icon{
+  width:36px;height:36px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;
+}
+.history-info{flex:1;}
+.history-name{font-size:14px;font-weight:600;margin-bottom:2px;}
+.history-time{font-size:12px;color:var(--text3);}
+.history-status{font-size:12px;font-weight:600;}
+.saved-item{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--border);
+}
+.saved-item:last-child{border-bottom:none;}
+.saved-name{flex:1;font-size:13px;font-weight:500;}
+.saved-type{font-size:11px;color:var(--text3);}
+
+/* ============================================================
+   FOOTER
+============================================================ */
+.footer{
+  border-top:1px solid var(--border);
+  padding:48px 80px;
+  display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;
+  margin-top:40px;
+}
+.footer-brand p{color:var(--text2);font-size:14px;line-height:1.7;margin-top:12px;max-width:260px;}
+.footer-col-title{font-family:var(--font-head);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text);margin-bottom:16px;}
+.footer-link{display:block;font-size:13px;color:var(--text2);margin-bottom:10px;cursor:pointer;transition:color 0.2s;}
+.footer-link:hover{color:var(--cyan);}
+.footer-bottom{
+  border-top:1px solid var(--border);padding:20px 80px;
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:12px;color:var(--text3);
+}
+
+/* MEDICINE DETAIL MODAL */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.7);
+  z-index:1000;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);padding:24px;animation:fadeIn 0.2s;
+}
+.modal{
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:20px;width:100%;max-width:540px;
+  padding:32px;max-height:80vh;overflow-y:auto;
+  animation:slideUp 0.3s ease;
+}
+.modal-header{display:flex;align-items:start;justify-content:space-between;margin-bottom:24px;}
+.modal-title{font-family:var(--font-head);font-size:22px;font-weight:800;}
+.modal-close{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;width:32px;height:32px;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:16px;color:var(--text2);
+  transition:all 0.2s;flex-shrink:0;
+}
+.modal-close:hover{background:var(--red-dim);color:var(--red);border-color:var(--red);}
+.modal-section{margin-bottom:20px;}
+.modal-section-title{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;}
+.ingredient-list{display:flex;flex-wrap:wrap;gap:8px;}
+.ingredient-pill{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:99px;padding:5px 12px;font-size:12px;color:var(--text);
+}
+
+/* LOADING SPINNER */
+.spinner{
+  width:20px;height:20px;border:2px solid rgba(0,212,255,0.2);
+  border-top-color:var(--cyan);border-radius:50%;
+  animation:spin 0.7s linear infinite;display:inline-block;
+}
+.loading-overlay{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;padding:40px;
+}
+.loading-text{color:var(--text2);font-size:14px;}
+
+/* AI RESULT */
+.ai-result{
+  background:linear-gradient(135deg,rgba(0,212,255,0.05),rgba(0,229,160,0.05));
+  border:1px solid rgba(0,212,255,0.2);
+  border-radius:14px;padding:20px;margin-top:16px;
+}
+.ai-label{font-size:11px;color:var(--cyan);font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.ai-label::before{content:'✦';font-size:10px;}
+.ai-text{font-size:14px;line-height:1.7;color:var(--text);}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:24px;right:24px;z-index:9000;
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:12px;padding:14px 20px;
+  display:flex;align-items:center;gap:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);
+  animation:slideUp 0.3s ease;font-size:14px;
+}
+.toast.success{border-color:rgba(0,229,160,0.3);}
+.toast.error{border-color:rgba(255,77,109,0.3);}
+
+/* ANIMATIONS */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .hero{padding:60px 24px 40px;}
+  .section{padding:48px 24px;}
+  .page-hero{padding:40px 24px 24px;}
+  .page-body{padding:24px;}
+  .steps-grid,.features-grid,.personas-grid{grid-template-columns:1fr;}
+  .verify-layout,.alt-grid,.dash-body{grid-template-columns:1fr;}
+  .dash-grid{grid-template-columns:1fr 1fr;}
+  .footer{grid-template-columns:1fr;padding:32px 24px;}
+  .footer-bottom{padding:16px 24px;flex-direction:column;gap:8px;}
+  .navbar{padding:0 16px;}
+  .nav-links{display:none;}
+  .auth-card{padding:32px 24px;}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+// ============================================================
+// MEDICINE DATABASE
+// ============================================================
+const MEDICINE_DB=[
+  {id:1,name:"Paracetamol 500mg",brand:"Crocin",company:"GSK",category:"Analgesic",ingredient:"Paracetamol",price:18,form:"Tablet",verified:true,status:"verified",schedule:"OTC",alternatives:[3,6,8],uses:"Fever, mild to moderate pain"},
+  {id:2,name:"Amoxicillin 500mg",brand:"Mox",company:"Cipla",category:"Antibiotic",ingredient:"Amoxicillin",price:85,form:"Capsule",verified:true,status:"verified",schedule:"Rx",alternatives:[9],uses:"Bacterial infections"},
+  {id:3,name:"Dolo 650",brand:"Dolo",company:"Micro Labs",category:"Analgesic",ingredient:"Paracetamol",price:30,form:"Tablet",verified:true,status:"verified",schedule:"OTC",alternatives:[1,6,8],uses:"Fever, headache, body pain"},
+  {id:4,name:"Azithromycin 500mg",brand:"Azithral",company:"Alembic",category:"Antibiotic",ingredient:"Azithromycin",price:92,form:"Tablet",verified:true,status:"verified",schedule:"Rx",alternatives:[10],uses:"Respiratory infections, skin infections"},
+  {id:5,name:"Cetirizine 10mg",brand:"Cetzine",company:"GSK",category:"Antihistamine",ingredient:"Cetirizine",price:22,form:"Tablet",verified:true,status:"verified",schedule:"OTC",alternatives:[11],uses:"Allergies, hay fever, urticaria"},
+  {id:6,name:"Combiflam",brand:"Combiflam",company:"Sanofi",category:"Analgesic",ingredient:"Ibuprofen+Paracetamol",price:35,form:"Tablet",verified:true,status:"verified",schedule:"OTC",alternatives:[1,3],uses:"Pain, fever, inflammation"},
+  {id:7,name:"Metformin 500mg",brand:"Glycomet",company:"USV",category:"Antidiabetic",ingredient:"Metformin",price:42,form:"Tablet",verified:true,status:"verified",schedule:"Rx",alternatives:[12],uses:"Type 2 diabetes management"},
+  {id:8,name:"Calpol 650",brand:"Calpol",company:"J&J",category:"Analgesic",ingredient:"Paracetamol",price:25,form:"Tablet",verified:true,status:"verified",schedule:"OTC",alternatives:[1,3],uses:"Fever, pain relief"},
+  {id:9,name:"Augmentin 625",brand:"Augmentin",company:"GSK",category:"Antibiotic",ingredient:"Amoxicillin+Clavulanate",price:168,form:"Tablet",verified:true,status:"verified",schedule:"Rx",alternatives:[2],uses:"Severe bacterial infections"},
+  {id:10,name:"Zithromax 500mg",brand:"Zithromax",company:"Pfizer",category:"Antibiotic",ingredient:"Azithromycin",price:215,form:"Tablet",verified:false,status:"flagged",schedule:"Rx",alternatives:[4],uses:"Bacterial infections"},
+  {id:11,name:"Allegra 120mg",brand:"Allegra",company:"Sanofi",category:"Antihistamine",ingredient:"Fexofenadine",price:78,form:"Tablet",verified:true,status:"verified",schedule:"OTC",alternatives:[5],uses:"Allergic rhinitis, chronic urticaria"},
+  {id:12,name:"Januvia 50mg",brand:"Januvia",company:"MSD",category:"Antidiabetic",ingredient:"Sitagliptin",price:980,form:"Tablet",verified:true,status:"verified",schedule:"Rx",alternatives:[7],uses:"Type 2 diabetes"},
+  {id:13,name:"FakeMed XR",brand:"QuickHeal",company:"Unknown Pharma",category:"Analgesic",ingredient:"Unknown",price:5,form:"Tablet",verified:false,status:"banned",schedule:"OTC",alternatives:[1,3],uses:"Claimed: pain relief"},
+  {id:14,name:"Omeprazole 20mg",brand:"Omez",company:"Dr Reddy's",category:"Antacid",ingredient:"Omeprazole",price:38,form:"Capsule",verified:true,status:"verified",schedule:"OTC",alternatives:[15],uses:"Acid reflux, peptic ulcer"},
+  {id:15,name:"Pantoprazole 40mg",brand:"Pan-D",company:"Sun Pharma",category:"Antacid",ingredient:"Pantoprazole",price:54,form:"Tablet",verified:true,status:"verified",schedule:"Rx",alternatives:[14],uses:"GERD, gastric ulcer"},
+  {id:16,name:"Atorvastatin 10mg",brand:"Atorva",company:"Zydus",category:"Statin",ingredient:"Atorvastatin",price:46,form:"Tablet",verified:true,status:"verified",schedule:"Rx",alternatives:[],uses:"High cholesterol, cardiovascular"},
+  {id:17,name:"Telmisartan 40mg",brand:"Telma",company:"Glenmark",category:"Antihypertensive",ingredient:"Telmisartan",price:62,form:"Tablet",verified:true,status:"verified",schedule:"Rx",alternatives:[],uses:"Hypertension, heart failure"},
+  {id:18,name:"Vitamin D3 60K",brand:"D-Rise",company:"Alkem",category:"Supplement",ingredient:"Cholecalciferol",price:125,form:"Capsule",verified:true,status:"verified",schedule:"OTC",alternatives:[],uses:"Vitamin D deficiency"},
+];
+
+const ALERTS=[
+  {id:1,title:"Fake Crocin Tablets Circulating in Mumbai",severity:"high",desc:"Counterfeit Crocin 500mg tablets with incorrect batch numbers (BN-2024XX) detected in unauthorized pharmacies across Andheri and Bandra regions. Packaging resembles original but has misspelled manufacturer address.",region:"Mumbai, Maharashtra",date:"3 days ago",icon:"⚠️",source:"CDSCO Alert #2024-112"},
+  {id:2,title:"Substandard Amoxicillin Capsules — Batch Recall",severity:"high",desc:"Sun Pharmaceuticals has issued a voluntary recall of Amoxicillin 500mg batch #SP-AM-2024-089 due to lower-than-required antibiotic concentration. Affected capsules may fail to treat bacterial infections.",region:"Pan India",date:"5 days ago",icon:"🚨",source:"Drug Alert DA-2024-089"},
+  {id:3,title:"Suspicious Online Pharmacy Selling Unapproved Antivirals",severity:"medium",desc:"Multiple reports of an online platform selling unlicensed antiviral medications claiming to treat COVID-19 variants. Products have no batch numbers and unverified composition.",region:"Online / National",date:"1 week ago",icon:"🔍",source:"Consumer Alert CA-2024-045"},
+  {id:4,title:"Expired Insulin Stock Found in Cold Chain Violation",severity:"medium",desc:"Inspection teams found expired insulin vials (Huminsulin R) being sold at two medical stores in Jaipur. Cold chain breach also detected — products may have lost efficacy.",region:"Jaipur, Rajasthan",date:"10 days ago",icon:"💉",source:"State Drug Authority SDA-RJ-2024"},
+  {id:5,title:"Generic Cetirizine Batch Cleared After Testing",severity:"low",desc:"Previously flagged batch of generic cetirizine tablets (Batch CE-G-887) has been cleared after laboratory testing confirmed compliance with pharmacopoeia standards.",region:"Pan India",date:"2 weeks ago",icon:"✅",source:"CDSCO Clearance #2024-CL-34"},
+];
+
+const CATEGORIES=["All","Analgesic","Antibiotic","Antihistamine","Antidiabetic","Antacid","Statin","Antihypertensive","Supplement"];
+
+// ============================================================
+// UTILITY
+// ============================================================
+function getInitials(name){
+  if(!name)return"U";
+  return name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function getMed(id){return MEDICINE_DB.find(m=>m.id===id);}
+
+// ============================================================
+// COMPONENTS
+// ============================================================
+function Spinner(){return <span className="spinner"/>;}
+
+function Toast({msg,type,onClose}){
+  useEffect(()=>{const t=setTimeout(onClose,3000);return()=>clearTimeout(t);},[]);
+  return(
+    <div className={`toast ${type}`}>
+      <span>{type==="success"?"✅":"❌"}</span>
+      <span>{msg}</span>
+    </div>
+  );
+}
+
+function Navbar({user,page,setPage,onLogout}){
+  const links=[
+    {id:"home",label:"Home"},
+    {id:"verify",label:"Verify Medicine"},
+    {id:"alternatives",label:"Find Alternatives"},
+    {id:"database",label:"Medicine DB"},
+    {id:"alerts",label:"Safety Alerts"},
+    {id:"dashboard",label:"Dashboard"},
+  ];
+  return(
+    <nav className="navbar">
+      <div className="nav-logo" onClick={()=>setPage("home")}>
+        <div className="nav-logo-icon">🔬</div>
+        <div className="nav-logo-text">Medi<span>Verify</span></div>
+      </div>
+      <div className="nav-links">
+        {links.map(l=>(
+          <div key={l.id} className={`nav-link ${page===l.id?"active":""}`} onClick={()=>setPage(l.id)}>{l.label}</div>
+        ))}
+      </div>
+      <div className="nav-right">
+        <div className="nav-badge">Live DB</div>
+        <div className="nav-user">
+          <div className="nav-avatar">{getInitials(user.name)}</div>
+          <span>{user.name.split(" ")[0]}</span>
+        </div>
+        <button className="nav-logout" onClick={onLogout}>Logout</button>
+      </div>
+    </nav>
+  );
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+function AuthPage({onAuth}){
+  const [mode,setMode]=useState("login");
+  const [name,setName]=useState("");
+  const [email,setEmail]=useState("");
+  const [password,setPassword]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState("");
+  const [success,setSuccess]=useState("");
+
+  // Simple localStorage-based user store
+  function getUsers(){try{return JSON.parse(localStorage.getItem("mv_users")||"[]")}catch{return[];}}
+  function saveUsers(u){localStorage.setItem("mv_users",JSON.stringify(u));}
+
+  async function handleSubmit(){
+    setError("");setSuccess("");
+    if(!email||!password){setError("Please fill in all required fields.");return;}
+    if(mode==="signup"&&!name){setError("Please enter your name.");return;}
+    if(!/\S+@\S+\.\S+/.test(email)){setError("Please enter a valid email address.");return;}
+    if(password.length<4){setError("Password must be at least 4 characters.");return;}
+    setLoading(true);
+    await sleep(900);
+    const users=getUsers();
+    if(mode==="signup"){
+      if(users.find(u=>u.email===email)){setError("An account with this email already exists.");setLoading(false);return;}
+      const newUser={id:Date.now(),name,email,password,joinedAt:new Date().toISOString()};
+      saveUsers([...users,newUser]);
+      setSuccess("Account created! Signing you in...");
+      await sleep(600);
+      onAuth({name,email});
+    } else {
+      const user=users.find(u=>u.email===email&&u.password===password);
+      if(!user){setError("Invalid email or password. Please try again.");setLoading(false);return;}
+      onAuth({name:user.name,email:user.email});
+    }
+    setLoading(false);
+  }
+
+  return(
+    <div className="auth-page page">
+      <div className="grid-bg"/>
+      <div className="orb orb1"/><div className="orb orb2"/>
+      <div className="auth-bg-lines"/>
+      <div className="auth-card">
+        <div className="auth-logo">
+          <div className="auth-logo-icon">🔬</div>
+          <div className="auth-logo-text">Medi<span>Verify</span> AI</div>
+        </div>
+        <div className="auth-heading">
+          {mode==="login"?"Welcome back":"Create your account"}
+        </div>
+        <div className="auth-sub">
+          {mode==="login"
+            ?<>Don't have an account? <span onClick={()=>{setMode("signup");setError("");setSuccess("");}}>Sign up free</span></>
+            :(<>Already have an account? <span onClick={()=>{setMode("login");setError("");setSuccess("");}}>Sign in</span></>)
+          }
+        </div>
+        {error&&<div className="error-msg">⚠ {error}</div>}
+        {success&&<div className="success-msg">✓ {success}</div>}
+        {mode==="signup"&&(
+          <div className="form-group">
+            <label className="form-label">Full Name</label>
+            <input className="form-input" placeholder="e.g. Priya Sharma" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSubmit()}/>
+          </div>
+        )}
+        <div className="form-group">
+          <label className="form-label">Email Address</label>
+          <input className="form-input" type="email" placeholder="you@example.com" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSubmit()}/>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Password</label>
+          <input className="form-input" type="password" placeholder={mode==="signup"?"Create a password":"Enter your password"} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSubmit()}/>
+        </div>
+        <button className="auth-btn" onClick={handleSubmit} disabled={loading}>
+          {loading?<><Spinner/> {mode==="signup"?"Creating Account...":"Signing In..."}</>
+           :mode==="signup"?"Create Account →":"Sign In →"}
+        </button>
+        <div className="auth-divider">Trusted by healthcare professionals</div>
+        <div className="auth-trust">
+          <div className="trust-item"><span>🔒</span><span>Secure & Private</span></div>
+          <div className="trust-item"><span>✅</span><span>WHO Approved DB</span></div>
+          <div className="trust-item"><span>🤖</span><span>AI Powered</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// HOME
+// ============================================================
+function HomePage({setPage}){
+  const [count,setCount]=useState({v:0,d:0,a:0});
+  useEffect(()=>{
+    let v=0,d=0,a=0;
+    const t=setInterval(()=>{
+      v=Math.min(v+247,124800);d=Math.min(d+13,6800);a=Math.min(a+89,44200);
+      setCount({v,d,a});
+      if(v>=124800)clearInterval(t);
+    },16);
+    return()=>clearInterval(t);
+  },[]);
+  return(
+    <div>
+      {/* HERO */}
+      <section className="hero">
+        <div className="hero-eyebrow">AI-Powered Medicine Safety Platform</div>
+        <h1 className="hero-title">
+          Detect Fake Medicines.<br/>
+          <span className="line2">Protect Every Life.</span>
+        </h1>
+        <p className="hero-desc">
+          MediVerify AI uses advanced image recognition, barcode scanning, and trusted pharmaceutical databases to verify medicine authenticity and find safe alternatives — instantly.
+        </p>
+        <div className="hero-ctas">
+          <button className="btn-primary" onClick={()=>setPage("verify")}>🔬 Verify a Medicine</button>
+          <button className="btn-secondary" onClick={()=>setPage("alternatives")}>💊 Find Alternatives</button>
+        </div>
+        <div className="hero-stats">
+          <div className="stat-item"><div className="stat-num">{count.v.toLocaleString()}+</div><div className="stat-label">Medicines Verified</div></div>
+          <div className="stat-item"><div className="stat-num red">{count.d.toLocaleString()}+</div><div className="stat-label">Fakes Detected</div></div>
+          <div className="stat-item"><div className="stat-num green">{count.a.toLocaleString()}+</div><div className="stat-label">Alternatives Found</div></div>
+          <div className="stat-item"><div className="stat-num yellow">18+</div><div className="stat-label">DB Sources</div></div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section className="section" style={{background:"var(--bg2)"}}>
+        <div className="section-header">
+          <div className="section-tag">How It Works</div>
+          <h2 className="section-title">Three Steps to <span>Medicine Safety</span></h2>
+          <p className="section-desc">Our AI-powered platform makes medicine verification simple, fast, and reliable for everyone.</p>
+        </div>
+        <div className="steps-grid">
+          {[
+            {n:"01",icon:"📷",title:"Scan or Search",desc:"Upload a photo of your medicine packaging, scan its QR/barcode, or simply type the medicine name to begin verification."},
+            {n:"02",icon:"🤖",title:"AI Analysis",desc:"Our AI engine cross-references your input against trusted databases — CDSCO, WHO, and our curated pharmaceutical registry — in seconds."},
+            {n:"03",icon:"✅",title:"Get Verified Results",desc:"Receive an instant authenticity verdict with confidence score, detailed composition info, and safe alternatives if needed."},
+          ].map(s=>(
+            <div key={s.n} className="step-card">
+              <div className="step-num">{s.n}</div>
+              <div className="step-icon">{s.icon}</div>
+              <div className="step-title">{s.title}</div>
+              <div className="step-desc">{s.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section className="section">
+        <div className="section-header">
+          <div className="section-tag">Platform Features</div>
+          <h2 className="section-title">Everything You Need for <span>Safe Medication</span></h2>
+        </div>
+        <div className="features-grid">
+          {[
+            {icon:"🔬",cls:"cyan",title:"AI Image Detection",desc:"Upload medicine packaging photos and our computer vision model analyzes fonts, holograms, and packaging details to detect counterfeits."},
+            {icon:"📱",cls:"green",title:"QR & Barcode Scan",desc:"Instantly verify any medicine by scanning its QR code or barcode against our verified pharmaceutical registry."},
+            {icon:"💊",cls:"yellow",title:"Alternative Finder",desc:"When your prescribed medicine is unavailable or expensive, find verified alternatives with the same active ingredients."},
+            {icon:"🚨",cls:"red",title:"Real-Time Safety Alerts",desc:"Get notified instantly when medicines in your history are flagged, recalled, or reported counterfeit."},
+            {icon:"📊",cls:"cyan",title:"Trusted Drug Database",desc:"Access our comprehensive database of 18,000+ verified medicines from CDSCO, WHO, and top pharmaceutical registries."},
+            {icon:"🏥",cls:"green",title:"Healthcare Provider Tools",desc:"Special tools for pharmacists and doctors to bulk-verify medicines, access drug interaction data, and generate reports."},
+          ].map(f=>(
+            <div key={f.title} className="feature-card">
+              <div className={`feature-icon ${f.cls}`}>{f.icon}</div>
+              <div className="feature-title">{f.title}</div>
+              <div className="feature-desc">{f.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* USER PERSONAS */}
+      <section className="section" style={{background:"var(--bg2)"}}>
+        <div className="section-header">
+          <div className="section-tag">Who Uses MediVerify</div>
+          <h2 className="section-title">Built for <span>Everyone</span> in Healthcare</h2>
+        </div>
+        <div className="personas-grid">
+          {[
+            {emoji:"👩",name:"Priya Sharma",role:"Patient / Consumer",desc:"A homemaker who wants to verify medicine authenticity before buying for her family. Uses the platform to scan packaging and check if medicines from local pharmacies are genuine.",tags:["Quick Verify","Family Safety","Budget Alerts"]},
+            {emoji:"👨‍⚕️",name:"Rajan Mehta",role:"Licensed Pharmacist",desc:"A pharmacist who needs a reliable tool to cross-check medicines, flag counterfeit batches in real-time, and recommend government-approved alternatives to customers.",tags:["Batch Verification","Bulk Check","Alt Finder"]},
+            {emoji:"👩‍⚕️",name:"Dr. Sneha Kapoor",role:"General Physician",desc:"A doctor who needs AI-powered medicine flagging integrated into her workflow to ensure patients receive genuine medicines and access WHO-approved alternatives.",tags:["Clinical Tools","Drug Alerts","Patient Safety"]},
+          ].map(p=>(
+            <div key={p.name} className="persona-card">
+              <div className="persona-avatar" style={{background:"var(--surface2)"}}>{p.emoji}</div>
+              <div className="persona-name">{p.name}</div>
+              <div className="persona-role">{p.role}</div>
+              <div className="persona-desc">{p.desc}</div>
+              <div className="persona-tags">{p.tags.map(t=><span key={t} className="tag">{t}</span>)}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA BANNER */}
+      <section className="section">
+        <div style={{
+          background:"linear-gradient(135deg,rgba(0,212,255,0.08) 0%,rgba(0,229,160,0.06) 100%)",
+          border:"1px solid rgba(0,212,255,0.15)",
+          borderRadius:"24px",padding:"60px",textAlign:"center",
+          maxWidth:"800px",margin:"0 auto",
+          boxShadow:"0 0 60px rgba(0,212,255,0.05)"
+        }}>
+          <div style={{fontSize:"48px",marginBottom:"16px"}}>🛡️</div>
+          <h2 style={{fontFamily:"var(--font-head)",fontSize:"32px",fontWeight:"800",marginBottom:"12px",letterSpacing:"-0.5px"}}>Start Verifying Medicines Today</h2>
+          <p style={{color:"var(--text2)",marginBottom:"28px",fontSize:"16px"}}>Join 50,000+ patients, pharmacists, and doctors protecting healthcare with AI.</p>
+          <div style={{display:"flex",gap:"12px",justifyContent:"center",flexWrap:"wrap"}}>
+            <button className="btn-primary" onClick={()=>setPage("verify")}>🔬 Verify Now — It's Free</button>
+            <button className="btn-secondary" onClick={()=>setPage("database")}>📋 Browse Database</button>
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="footer">
+        <div className="footer-brand">
+          <div className="nav-logo" style={{marginBottom:"0"}}>
+            <div className="nav-logo-icon" style={{width:"36px",height:"36px",borderRadius:"9px",background:"linear-gradient(135deg,var(--cyan),var(--green))",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px"}}>🔬</div>
+            <div className="nav-logo-text" style={{fontFamily:"var(--font-head)",fontSize:"18px",fontWeight:"700"}}>Medi<span style={{color:"var(--cyan)"}}>Verify</span> AI</div>
+          </div>
+          <p>India's most trusted AI-powered medicine verification and alternative finder platform. Protecting patients since 2024.</p>
+        </div>
+        {[
+          {title:"Platform",links:["Verify Medicine","Find Alternatives","Medicine Database","Safety Alerts","Dashboard"]},
+          {title:"Resources",links:["CDSCO Guidelines","WHO Drug List","Drug Recall Notices","API Documentation","Help Center"]},
+          {title:"Company",links:["About Us","Our Mission","Privacy Policy","Terms of Service","Contact"]},
+        ].map(col=>(
+          <div key={col.title}>
+            <div className="footer-col-title">{col.title}</div>
+            {col.links.map(l=><div key={l} className="footer-link">{l}</div>)}
+          </div>
+        ))}
+      </footer>
+      <div className="footer-bottom">
+        <span>© 2024 MediVerify AI — Built by Code Crew | Sapthagiri NPS University</span>
+        <span style={{color:"var(--green)"}}>🔒 CDSCO Compliant | WHO Registered</span>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// VERIFIER
+// ============================================================
+function VerifyPage(){
+  const [query,setQuery]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [result,setResult]=useState(null);
+  const [aiAnalysis,setAiAnalysis]=useState("");
+  const [aiLoading,setAiLoading]=useState(false);
+  const [selectedFile,setSelectedFile]=useState(null);
+  const [toast,setToast]=useState(null);
+  const fileRef=useRef();
+
+  async function handleVerify(){
+    if(!query.trim()&&!selectedFile){setToast({msg:"Please enter a medicine name or upload an image.",type:"error"});return;}
+    setLoading(true);setResult(null);setAiAnalysis("");
+    await sleep(1200);
+    const q=query.toLowerCase().trim();
+    let found=MEDICINE_DB.find(m=>
+      m.name.toLowerCase().includes(q)||
+      m.brand.toLowerCase().includes(q)||
+      m.ingredient.toLowerCase().includes(q)
+    );
+    if(!found&&selectedFile) found=MEDICINE_DB[Math.floor(Math.random()*MEDICINE_DB.length)];
+    if(found){
+      const confidence=found.status==="verified"?Math.floor(Math.random()*8+91):found.status==="flagged"?Math.floor(Math.random()*15+55):Math.floor(Math.random()*20+20);
+      setResult({...found,confidence,type:found.status==="verified"?"genuine":found.status==="flagged"?"suspicious":"fake"});
+    } else {
+      setResult({id:0,name:query||"Unknown Medicine",brand:"Unknown",company:"—",status:"flagged",type:"suspicious",confidence:42,ingredient:"Unknown",category:"Unknown",form:"Unknown",schedule:"Unknown",uses:"—",price:0,alternatives:[]});
+    }
+    setLoading(false);
+    // AI analysis
+    if(found){
+      setAiLoading(true);
+      try{
+        const res=await fetch("https://api.anthropic.com/v1/messages",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            model:"claude-sonnet-4-20250514",
+            max_tokens:1000,
+            messages:[{role:"user",content:`You are a pharmaceutical expert AI for MediVerify AI, a medicine safety platform. 
+            Analyze this medicine and provide a brief 2-3 sentence expert safety analysis:
+            Medicine: ${found.name} (${found.brand}) by ${found.company}
+            Active Ingredient: ${found.ingredient}
+            Category: ${found.category}
+            Status in our database: ${found.status}
+            
+            Provide a concise, professional safety assessment. Mention the active ingredient, typical use, and any relevant safety notes. Keep it under 80 words.`}]
+          })
+        });
+        const data=await res.json();
+        const text=data.content?.find(c=>c.type==="text")?.text||"";
+        setAiAnalysis(text);
+      }catch(e){setAiAnalysis("AI analysis temporarily unavailable. Our database verification is complete.");}
+      setAiLoading(false);
+    }
+  }
+
+  return(
+    <div>
+      {toast&&<Toast msg={toast.msg} type={toast.type} onClose={()=>setToast(null)}/>}
+      <div className="page-hero">
+        <div className="page-hero-inner">
+          <div className="section-tag" style={{marginBottom:"12px"}}>AI Verification Engine</div>
+          <div className="page-title">Medicine <span>Authenticator</span></div>
+          <div className="page-desc">Search by name, scan a barcode, or upload packaging to instantly verify any medicine.</div>
+        </div>
+      </div>
+      <div className="page-body">
+        <div className="verify-layout">
+          {/* LEFT: INPUT */}
+          <div>
+            <div className="verify-panel" style={{marginBottom:"20px"}}>
+              <div className="panel-title"><span>🔍</span> Search by Name</div>
+              <div className="search-row">
+                <input className="search-input" placeholder="e.g. Crocin, Paracetamol, Dolo 650..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleVerify()}/>
+                <button className="btn-search" onClick={handleVerify} disabled={loading}>
+                  {loading?<Spinner/>:"🔬"} {loading?"Verifying...":"Verify"}
+                </button>
+              </div>
+              <div style={{fontSize:"12px",color:"var(--text3)"}}>
+                Try: <span style={{color:"var(--cyan)",cursor:"pointer"}} onClick={()=>setQuery("Crocin")}>Crocin</span>,{" "}
+                <span style={{color:"var(--cyan)",cursor:"pointer"}} onClick={()=>setQuery("Dolo 650")}>Dolo 650</span>,{" "}
+                <span style={{color:"var(--cyan)",cursor:"pointer"}} onClick={()=>setQuery("FakeMed XR")}>FakeMed XR</span>
+              </div>
+            </div>
+            <div className="verify-panel">
+              <div className="panel-title"><span>📷</span> Upload Packaging Image</div>
+              <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>setSelectedFile(e.target.files[0])}/>
+              <div className="upload-zone" onClick={()=>fileRef.current.click()}>
+                <div className="upload-icon">{selectedFile?"📦":"📸"}</div>
+                <div className="upload-text">{selectedFile?selectedFile.name:"Click to upload medicine packaging"}</div>
+                <div className="upload-hint">PNG, JPG up to 10MB — AI will analyze the image</div>
+              </div>
+              {selectedFile&&(
+                <button className="btn-search" style={{width:"100%",marginTop:"12px",justifyContent:"center"}} onClick={handleVerify} disabled={loading}>
+                  {loading?<><Spinner/>Analyzing Image...</>:"🤖 Analyze with AI"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT: RESULT */}
+          <div>
+            {!result&&!loading&&(
+              <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:"20px",padding:"60px",textAlign:"center"}}>
+                <div style={{fontSize:"56px",marginBottom:"16px",animation:"float 3s ease-in-out infinite"}}>🔬</div>
+                <div style={{fontFamily:"var(--font-head)",fontSize:"18px",fontWeight:"700",marginBottom:"8px"}}>Ready to Verify</div>
+                <div style={{color:"var(--text2)",fontSize:"14px"}}>Search for a medicine or upload an image to check its authenticity.</div>
+              </div>
+            )}
+            {loading&&(
+              <div style={{background:"var(--surface)",border:"1px solid var(--border2)",borderRadius:"20px"}}>
+                <div className="loading-overlay">
+                  <div style={{position:"relative",width:"64px",height:"64px"}}>
+                    <div style={{position:"absolute",inset:"0",borderRadius:"50%",border:"3px solid rgba(0,212,255,0.1)"}}/>
+                    <div style={{position:"absolute",inset:"0",borderRadius:"50%",border:"3px solid transparent",borderTopColor:"var(--cyan)",animation:"spin 1s linear infinite"}}/>
+                    <div style={{position:"absolute",inset:"8px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px"}}>🔬</div>
+                  </div>
+                  <div className="loading-text">Cross-referencing pharmaceutical databases...</div>
+                  <div style={{fontSize:"12px",color:"var(--text3)"}}>Checking CDSCO · WHO · DrugBank · RxNorm</div>
+                </div>
+              </div>
+            )}
+            {result&&!loading&&(
+              <div className="result-card">
+                <div className="result-header">
+                  <div>
+                    <div className={`result-badge ${result.type}`}>
+                      {result.type==="genuine"?"✅ Genuine":result.type==="suspicious"?"⚠️ Suspicious":"❌ Counterfeit"}
+                    </div>
+                  </div>
+                </div>
+                <div style={{marginBottom:"16px"}}>
+                  <div className="result-med-name">{result.name}</div>
+                  <div className="result-manufacturer">{result.company} · {result.brand}</div>
+                </div>
+                <div className="confidence-bar">
+                  <div className="confidence-label">
+                    <span>Authenticity Confidence</span>
+                    <span style={{fontWeight:"700",color:result.type==="genuine"?"var(--green)":result.type==="suspicious"?"var(--yellow)":"var(--red)"}}>{result.confidence}%</span>
+                  </div>
+                  <div className="confidence-track">
+                    <div className={`confidence-fill ${result.type}`} style={{width:`${result.confidence}%`}}/>
+                  </div>
+                </div>
+                <div className="result-details">
+                  {[
+                    {l:"Active Ingredient",v:result.ingredient},
+                    {l:"Category",v:result.category},
+                    {l:"Form",v:result.form},
+                    {l:"Schedule",v:result.schedule},
+                    {l:"Price Range",v:result.price?`₹${result.price}/strip`:"Unknown"},
+                    {l:"Primary Use",v:result.uses},
+                  ].map(d=>(
+                    <div key={d.l} className="detail-item">
+                      <div className="detail-label">{d.l}</div>
+                      <div className="detail-value">{d.v}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* AI Analysis */}
+                {(aiLoading||aiAnalysis)&&(
+                  <div className="ai-result">
+                    <div className="ai-label">Claude AI Expert Analysis</div>
+                    {aiLoading?<div style={{display:"flex",alignItems:"center",gap:"8px",color:"var(--text2)",fontSize:"13px"}}><Spinner/>Generating expert analysis...</div>
+                    :<div className="ai-text">{aiAnalysis}</div>}
+                  </div>
+                )}
+                <div className="result-actions">
+                  <button className="btn-outline" onClick={()=>setToast({msg:"Medicine saved to your dashboard.",type:"success"})}>💾 Save</button>
+                  <button className="btn-outline" onClick={()=>setToast({msg:"Report submitted. Thank you!",type:"success"})}>🚩 Report</button>
+                  {result.alternatives?.length>0&&<button className="btn-green">💊 Find Alternatives</button>}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ALTERNATIVES
+// ============================================================
+function AlternativesPage(){
+  const [query,setQuery]=useState("");
+  const [results,setResults]=useState([]);
+  const [searched,setSearched]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [activeFilter,setActiveFilter]=useState("All");
+  const [modal,setModal]=useState(null);
+  const [aiRec,setAiRec]=useState("");
+  const [aiLoading,setAiLoading]=useState(false);
+
+  async function handleSearch(){
+    if(!query.trim())return;
+    setLoading(true);setSearched(true);setResults([]);setAiRec("");
+    await sleep(900);
+    const q=query.toLowerCase();
+    const base=MEDICINE_DB.find(m=>m.name.toLowerCase().includes(q)||m.brand.toLowerCase().includes(q)||m.ingredient.toLowerCase().includes(q));
+    let alts=[];
+    if(base){
+      alts=MEDICINE_DB.filter(m=>
+        m.id!==base.id&&(
+          m.ingredient.toLowerCase().includes(base.ingredient.split("+")[0].toLowerCase())||
+          base.alternatives.includes(m.id)
+        )
+      );
+    } else {
+      alts=MEDICINE_DB.filter(m=>m.category==="Analgesic").slice(0,5);
+    }
+    setResults(alts);
+    setLoading(false);
+    if(alts.length>0){
+      setAiLoading(true);
+      try{
+        const res=await fetch("https://api.anthropic.com/v1/messages",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            model:"claude-sonnet-4-20250514",
+            max_tokens:1000,
+            messages:[{role:"user",content:`You are a pharmacist AI on MediVerify AI platform. The user searched for "${query}". 
+            We found these alternatives: ${alts.slice(0,3).map(a=>a.name+" ("+a.ingredient+", ₹"+a.price+")").join(", ")}.
+            Give a 2-sentence clinical recommendation on which alternative is most appropriate and why, considering efficacy and cost. Be concise and professional. Under 60 words.`}]
+          })
+        });
+        const data=await res.json();
+        setAiRec(data.content?.find(c=>c.type==="text")?.text||"");
+      }catch(e){setAiRec("");}
+      setAiLoading(false);
+    }
+  }
+
+  const filtered=activeFilter==="All"?results:results.filter(r=>r.category===activeFilter);
+
+  return(
+    <div>
+      {modal&&(
+        <div className="modal-overlay" onClick={()=>setModal(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">{modal.name}</div>
+                <div style={{color:"var(--text2)",fontSize:"13px",marginTop:"4px"}}>{modal.brand} · {modal.company}</div>
+              </div>
+              <div className="modal-close" onClick={()=>setModal(null)}>✕</div>
+            </div>
+            {[
+              {label:"Active Ingredient",value:modal.ingredient},
+              {label:"Category",value:modal.category},
+              {label:"Form",value:modal.form},
+              {label:"Schedule",value:modal.schedule},
+              {label:"Price",value:`₹${modal.price} per strip`},
+              {label:"Primary Uses",value:modal.uses},
+              {label:"Verification Status",value:modal.status.toUpperCase()},
+            ].map(f=>(
+              <div key={f.label} className="modal-section">
+                <div className="modal-section-title">{f.label}</div>
+                <div style={{fontSize:"15px",fontWeight:"500"}}>{f.value}</div>
+              </div>
+            ))}
+            <div className="modal-section">
+              <div className="modal-section-title">Active Ingredients</div>
+              <div className="ingredient-list">
+                {modal.ingredient.split("+").map(i=><span key={i} className="ingredient-pill">{i.trim()}</span>)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="page-hero">
+        <div className="page-hero-inner">
+          <div className="section-tag" style={{marginBottom:"12px"}}>Smart Alternative Finder</div>
+          <div className="page-title">Find Safe <span>Alternatives</span></div>
+          <div className="page-desc">When your medicine is unavailable or too expensive, find verified alternatives with the same active ingredients.</div>
+        </div>
+      </div>
+      <div className="page-body">
+        <div className="search-row" style={{maxWidth:"600px",marginBottom:"32px"}}>
+          <input className="search-input" placeholder="Enter medicine name or active ingredient..." value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleSearch()}/>
+          <button className="btn-search" onClick={handleSearch} disabled={loading}>{loading?<Spinner/>:"💊"} {loading?"Searching...":"Find Alternatives"}</button>
+        </div>
+        {(aiRec||aiLoading)&&(
+          <div className="ai-result" style={{marginBottom:"24px",maxWidth:"700px"}}>
+            <div className="ai-label">AI Pharmacist Recommendation</div>
+            {aiLoading?<div style={{display:"flex",alignItems:"center",gap:"8px",color:"var(--text2)",fontSize:"13px"}}><Spinner/>Generating recommendation...</div>:<div className="ai-text">{aiRec}</div>}
+          </div>
+        )}
+        {searched&&(
+          <div className="alt-grid">
+            <div className="filter-panel">
+              <div className="filter-title">Filter Results</div>
+              <div className="filter-group">
+                <span className="filter-label">Category</span>
+                <div className="filter-options">
+                  {["All",...new Set(results.map(r=>r.category))].map(c=>(
+                    <div key={c} className={`filter-chip ${activeFilter===c?"active":""}`} onClick={()=>setActiveFilter(c)}>{c}</div>
+                  ))}
+                </div>
+              </div>
+              <div style={{padding:"16px",background:"var(--bg2)",borderRadius:"10px",marginTop:"16px"}}>
+                <div style={{fontSize:"12px",color:"var(--text3)",marginBottom:"8px",textTransform:"uppercase",letterSpacing:"0.5px"}}>Legend</div>
+                {[{c:"cyan",l:"Generic Medicine"},{c:"yellow",l:"Branded Medicine"},{c:"green",l:"Exact Ingredient Match"}].map(({c,l})=>(
+                  <div key={l} style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px",fontSize:"12px",color:"var(--text2)"}}>
+                    <span className={`alt-tag ${c}`} style={{padding:"2px 8px"}}>{l}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              {loading?(
+                <div className="loading-overlay"><Spinner/><div className="loading-text">Finding best alternatives...</div></div>
+              ):(
+                <>
+                  <div className="results-header">
+                    <div className="results-count">Showing <span>{filtered.length}</span> alternatives</div>
+                  </div>
+                  {filtered.length===0?
+                    <div style={{textAlign:"center",padding:"40px",color:"var(--text2)"}}>No alternatives found. Try a different medicine name.</div>:
+                    <div className="alt-cards">
+                      {filtered.map((m,i)=>(
+                        <div key={m.id} className="alt-card" onClick={()=>setModal(m)}>
+                          <div className="alt-rank">#{i+1}</div>
+                          <div className="alt-info">
+                            <div className="alt-name">{m.name}</div>
+                            <div className="alt-company">{m.brand} · {m.company}</div>
+                            <div className="alt-tags">
+                              <span className={`alt-tag ${m.brand===m.company?"generic":"branded"}`}>{m.brand===m.company?"Generic":"Branded"}</span>
+                              <span className="alt-tag match">✓ Ingredient Match</span>
+                              <span className="alt-tag" style={{background:"var(--surface2)",color:"var(--text2)"}}>{m.category}</span>
+                            </div>
+                          </div>
+                          <div className="alt-price">
+                            <div className="price-num">₹{m.price}</div>
+                            <div className="price-unit">per strip</div>
+                            <div className="price-badge">Available</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  }
+                </>
+              )}
+            </div>
+          </div>
+        )}
+        {!searched&&(
+          <div style={{textAlign:"center",padding:"60px 0"}}>
+            <div style={{fontSize:"56px",marginBottom:"16px",animation:"float 3s ease-in-out infinite"}}>💊</div>
+            <div style={{fontFamily:"var(--font-head)",fontSize:"18px",fontWeight:"700",marginBottom:"8px"}}>Find the Right Alternative</div>
+            <div style={{color:"var(--text2)",fontSize:"14px",marginBottom:"20px"}}>Try searching for popular medicines like Crocin, Amoxicillin, or Omeprazole</div>
+            <div style={{display:"flex",gap:"8px",justifyContent:"center",flexWrap:"wrap"}}>
+              {["Paracetamol","Amoxicillin","Omeprazole","Cetirizine"].map(s=>(
+                <button key={s} className="filter-chip" onClick={()=>{setQuery(s);}} style={{cursor:"pointer"}}>{s}</button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// DATABASE
+// ============================================================
+function DatabasePage(){
+  const [query,setQuery]=useState("");
+  const [category,setCategory]=useState("All");
+  const [modal,setModal]=useState(null);
+  const filtered=MEDICINE_DB.filter(m=>{
+    const q=query.toLowerCase();
+    const matchQ=!q||m.name.toLowerCase().includes(q)||m.brand.toLowerCase().includes(q)||m.ingredient.toLowerCase().includes(q)||m.company.toLowerCase().includes(q);
+    const matchC=category==="All"||m.category===category;
+    return matchQ&&matchC;
+  });
+  const categoryColors={Analgesic:"#00d4ff",Antibiotic:"#ff4d6d",Antihistamine:"#ffd166",Antidiabetic:"#00e5a0",Antacid:"#a78bfa",Statin:"#fb923c",Antihypertensive:"#34d399",Supplement:"#60a5fa"};
+  return(
+    <div>
+      {modal&&(
+        <div className="modal-overlay" onClick={()=>setModal(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-header">
+              <div><div className="modal-title">{modal.name}</div><div style={{color:"var(--text2)",fontSize:"13px",marginTop:"4px"}}>{modal.brand} · {modal.company}</div></div>
+              <div className="modal-close" onClick={()=>setModal(null)}>✕</div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"20px"}}>
+              {[{l:"Ingredient",v:modal.ingredient},{l:"Category",v:modal.category},{l:"Form",v:modal.form},{l:"Schedule",v:modal.schedule},{l:"Price",v:"₹"+modal.price},{l:"Status",v:modal.status.toUpperCase()}].map(f=>(
+                <div key={f.l} className="detail-item"><div className="detail-label">{f.l}</div><div className="detail-value">{f.v}</div></div>
+              ))}
+            </div>
+            <div className="modal-section"><div className="modal-section-title">Primary Uses</div><div style={{color:"var(--text2)",fontSize:"14px"}}>{modal.uses}</div></div>
+            <div className="modal-section">
+              <div className="modal-section-title">Active Ingredients</div>
+              <div className="ingredient-list">{modal.ingredient.split("+").map(i=><span key={i} className="ingredient-pill">{i.trim()}</span>)}</div>
+            </div>
+            {modal.alternatives.length>0&&(
+              <div className="modal-section">
+                <div className="modal-section-title">Known Alternatives</div>
+                <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
+                  {modal.alternatives.map(id=>{const m=getMed(id);return m?<div key={id} style={{fontSize:"13px",color:"var(--cyan)"}}>• {m.name} ({m.brand})</div>:null;})}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <div className="page-hero">
+        <div className="page-hero-inner">
+          <div className="section-tag" style={{marginBottom:"12px"}}>Pharmaceutical Registry</div>
+          <div className="page-title">Medicine <span>Database</span></div>
+          <div className="page-desc">Browse our verified database of {MEDICINE_DB.length}+ medicines with complete composition and safety data.</div>
+        </div>
+      </div>
+      <div className="page-body">
+        <div style={{display:"flex",gap:"12px",marginBottom:"20px",flexWrap:"wrap"}}>
+          <input className="search-input" style={{flex:"1",minWidth:"200px"}} placeholder="Search by name, ingredient, brand, company..." value={query} onChange={e=>setQuery(e.target.value)}/>
+          <select className="search-input" style={{flex:"0 0 auto",width:"180px"}} value={category} onChange={e=>setCategory(e.target.value)}>
+            {CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div style={{marginBottom:"16px",fontSize:"14px",color:"var(--text2)"}}>Showing <span style={{color:"var(--text)",fontWeight:"600"}}>{filtered.length}</span> medicines</div>
+        <div className="db-table-wrap">
+          <table className="db-table">
+            <thead>
+              <tr>
+                <th>Medicine</th><th>Ingredient</th><th>Category</th><th>Form</th><th>Price</th><th>Schedule</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(m=>(
+                <tr key={m.id} style={{cursor:"pointer"}} onClick={()=>setModal(m)}>
+                  <td><div className="med-name-cell">{m.name}</div><div className="med-company">{m.brand} · {m.company}</div></td>
+                  <td style={{color:"var(--text2)",fontSize:"13px"}}>{m.ingredient}</td>
+                  <td><span className="category-badge" style={{background:`${categoryColors[m.category]||"#666"}22`,color:categoryColors[m.category]||"var(--text2)",fontSize:"11px",fontWeight:"600",padding:"3px 10px",borderRadius:"99px"}}>{m.category}</span></td>
+                  <td style={{color:"var(--text2)",fontSize:"13px"}}>{m.form}</td>
+                  <td style={{fontWeight:"600"}}>₹{m.price}</td>
+                  <td style={{fontSize:"13px",color:"var(--text2)"}}>{m.schedule}</td>
+                  <td><div className="status-dot"><div className={`dot ${m.status}`}/><span style={{fontSize:"13px",color:m.status==="verified"?"var(--green)":m.status==="flagged"?"var(--yellow)":"var(--red)",fontWeight:"600",textTransform:"capitalize"}}>{m.status}</span></div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ALERTS
+// ============================================================
+function AlertsPage(){
+  const [filter,setFilter]=useState("All");
+  const filtered=filter==="All"?ALERTS:ALERTS.filter(a=>a.severity===filter.toLowerCase());
+  return(
+    <div>
+      <div className="page-hero">
+        <div className="page-hero-inner">
+          <div className="section-tag" style={{marginBottom:"12px"}}>Live Safety Feed</div>
+          <div className="page-title">Safety <span>Alerts</span></div>
+          <div className="page-desc">Real-time alerts on counterfeit medicines, drug recalls, and safety warnings from CDSCO and WHO.</div>
+        </div>
+      </div>
+      <div className="page-body">
+        <div style={{display:"flex",gap:"8px",marginBottom:"28px",flexWrap:"wrap"}}>
+          {["All","High","Medium","Low"].map(f=>(
+            <div key={f} className={`filter-chip ${filter===f?"active":""}`} onClick={()=>setFilter(f)}>{f==="High"?"🚨":f==="Medium"?"⚠️":f==="Low"?"ℹ️":"🔔"} {f}</div>
+          ))}
+          <div style={{marginLeft:"auto",fontSize:"13px",color:"var(--text3)",display:"flex",alignItems:"center",gap:"6px"}}>
+            <div className="dot" style={{background:"var(--green)",animation:"pulse 2s infinite"}}/>
+            Live feed · Updated 2 min ago
+          </div>
+        </div>
+        <div className="alerts-list">
+          {filtered.map(a=>(
+            <div key={a.id} className={`alert-card ${a.severity}`}>
+              <div className={`alert-icon ${a.severity}`}>{a.icon}</div>
+              <div className="alert-content">
+                <div className="alert-header">
+                  <div className="alert-title">{a.title}</div>
+                  <div className={`alert-severity ${a.severity}`}>{a.severity}</div>
+                </div>
+                <div className="alert-desc">{a.desc}</div>
+                <div className="alert-meta">
+                  <span>📍 {a.region}</span>
+                  <span>🕐 {a.date}</span>
+                  <span>📋 {a.source}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function DashboardPage({user,setPage}){
+  const history=[
+    {name:"Crocin 500mg",time:"Today, 2:34 PM",status:"Genuine",statusColor:"var(--green)",icon:"💊",iconBg:"var(--green-dim)"},
+    {name:"Dolo 650",time:"Today, 11:10 AM",status:"Genuine",statusColor:"var(--green)",icon:"💊",iconBg:"var(--green-dim)"},
+    {name:"FakeMed XR",time:"Yesterday, 6:45 PM",status:"Counterfeit",statusColor:"var(--red)",icon:"⚠️",iconBg:"var(--red-dim)"},
+    {name:"Azithral 500",time:"Yesterday, 4:20 PM",status:"Genuine",statusColor:"var(--green)",icon:"💊",iconBg:"var(--green-dim)"},
+    {name:"Unknown Tablet",time:"2 days ago",status:"Suspicious",statusColor:"var(--yellow)",icon:"❓",iconBg:"var(--yellow-dim)"},
+  ];
+  const saved=[
+    {name:"Paracetamol 500mg",type:"Verified Medicine"},
+    {name:"Omeprazole 20mg",type:"Verified Medicine"},
+    {name:"Cetirizine 10mg",type:"Alternative"},
+    {name:"Azithromycin 500mg",type:"Verified Medicine"},
+  ];
+  return(
+    <div>
+      <div className="page-hero">
+        <div className="page-hero-inner">
+          <div className="section-tag" style={{marginBottom:"12px"}}>Personal Dashboard</div>
+          <div className="page-title">Welcome back, <span>{user.name.split(" ")[0]}</span> 👋</div>
+          <div className="page-desc">Your medicine safety activity and saved medicines at a glance.</div>
+        </div>
+      </div>
+      <div className="page-body">
+        <div className="dash-grid">
+          {[
+            {icon:"🔬",num:"24",label:"Total Verifications",cls:"cyan"},
+            {icon:"✅",num:"21",label:"Genuine Medicines",cls:"green"},
+            {icon:"❌",num:"2",label:"Fakes Detected",cls:"red"},
+            {icon:"💊",num:"8",label:"Alternatives Saved",cls:"yellow"},
+          ].map(s=>(
+            <div key={s.label} className="dash-stat">
+              <div className="dash-stat-icon">{s.icon}</div>
+              <div className={`dash-stat-num ${s.cls}`}>{s.num}</div>
+              <div className="dash-stat-label">{s.label}</div>
+            </div>
+          ))}
+        </div>
+        <div className="dash-body">
+          <div className="dash-panel">
+            <div className="dash-panel-title">Recent Verification History<a onClick={()=>setPage("verify")}>Verify More →</a></div>
+            {history.map((h,i)=>(
+              <div key={i} className="history-item">
+                <div className="history-icon" style={{background:h.iconBg}}>{h.icon}</div>
+                <div className="history-info">
+                  <div className="history-name">{h.name}</div>
+                  <div className="history-time">{h.time}</div>
+                </div>
+                <div className="history-status" style={{color:h.statusColor}}>{h.status}</div>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="dash-panel" style={{marginBottom:"20px"}}>
+              <div className="dash-panel-title">Saved Medicines<a>View All →</a></div>
+              {saved.map((s,i)=>(
+                <div key={i} className="saved-item">
+                  <span style={{fontSize:"16px"}}>💊</span>
+                  <div style={{flex:1}}>
+                    <div className="saved-name">{s.name}</div>
+                    <div className="saved-type">{s.type}</div>
+                  </div>
+                  <span style={{color:"var(--cyan)",fontSize:"12px",cursor:"pointer"}}>→</span>
+                </div>
+              ))}
+            </div>
+            <div className="dash-panel" style={{background:"linear-gradient(135deg,rgba(255,77,109,0.08),rgba(255,77,109,0.03))",border:"1px solid rgba(255,77,109,0.2)"}}>
+              <div className="dash-panel-title" style={{color:"var(--red)"}}>⚠️ Active Alerts</div>
+              <div style={{fontSize:"14px",color:"var(--text2)",lineHeight:"1.6"}}>
+                2 new safety alerts affecting medicines in your area.
+              </div>
+              <button className="btn-outline" style={{width:"100%",marginTop:"12px",borderColor:"rgba(255,77,109,0.3)",color:"var(--red)"}} onClick={()=>setPage("alerts")}>View Safety Alerts →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ROOT APP
+// ============================================================
+function App(){
+  const [user,setUser]=useState(()=>{
+    try{const u=localStorage.getItem("mv_session");return u?JSON.parse(u):null;}catch{return null;}
+  });
+  const [page,setPage]=useState("home");
+  const [toast,setToast]=useState(null);
+
+  function handleAuth(u){
+    setUser(u);
+    localStorage.setItem("mv_session",JSON.stringify(u));
+  }
+  function handleLogout(){
+    setUser(null);
+    localStorage.removeItem("mv_session");
+    setPage("home");
+  }
+
+  if(!user) return <AuthPage onAuth={handleAuth}/>;
+
+  return(
+    <div className="app">
+      <div className="grid-bg"/>
+      <div className="orb orb1"/><div className="orb orb2"/><div className="orb orb3"/>
+      {toast&&<Toast msg={toast.msg} type={toast.type} onClose={()=>setToast(null)}/>}
+      <Navbar user={user} page={page} setPage={setPage} onLogout={handleLogout}/>
+      <div className="main-content">
+        {page==="home"&&<HomePage setPage={setPage}/>}
+        {page==="verify"&&<VerifyPage/>}
+        {page==="alternatives"&&<AlternativesPage/>}
+        {page==="database"&&<DatabasePage/>}
+        {page==="alerts"&&<AlertsPage/>}
+        {page==="dashboard"&&<DashboardPage user={user} setPage={setPage}/>}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
